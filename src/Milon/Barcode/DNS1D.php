@@ -261,14 +261,13 @@ class DNS1D {
      * @return path or false in case of error.
      * @protected
      */
-    protected function getBarcodePNGPath($code, $type, $w = 2, $h = 30, $color = array(0, 0, 0), $printtext = false) {
+    protected function getBarcodePNGPath($code, $type, $w = 2, $h = 30, $color = array(0, 0, 0), $showCode = false) {
         if (!$this->store_path) {
             $this->setStorPath(app('config')->get("barcode.store_path"));
         }
         $this->setBarcode($code, $type);
         // calculate image size
-
-        $width = ($this->barcode_array['maxw'] * $w) + 10;
+        $width = ($this->barcode_array['maxw'] * $w);
         $height = $h;
         if (function_exists('imagecreate')) {
             // GD library
@@ -288,20 +287,16 @@ class DNS1D {
         } else {
             return false;
         }
-
-
-
         // print bars
-        $x = 5;
-        //dd($this->barcode_array['bcode']);
+        $x = 0;
         foreach ($this->barcode_array['bcode'] as $k => $v) {
             $bw = round(($v['w'] * $w), 3);
             $bh = round(($v['h'] * $h / $this->barcode_array['maxh']), 3);
-            $bh = $bh - 20;
-
+	    
+	    if($showCode)
+                 $bh -= imagefontheight(3) ;
             if ($v['t']) {
                 $y = round(($v['p'] * $h / $this->barcode_array['maxh']), 3);
-                $y = 5;
                 // draw a vertical bar
                 if ($imagick) {
                     $bar->rectangle($x, $y, ($x + $bw), ($y + $bh));
@@ -311,37 +306,22 @@ class DNS1D {
             }
             $x += $bw;
         }
+	if($showCode)
+            if ($imagick) {
+                $bar->setTextAlignment(\Imagick::ALIGN_CENTER);
+                $bar->annotation( 10 , $h - $bh +10 , $code );
+            } else {
+                $width_text = imagefontwidth(3) * strlen($code);
+                $height_text = imagefontheight(3);
+                imagestring($png, 3, ($width/2) - ($width_text/2) , ($height - $height_text) , $code, $fgcol);
+            }
+            
         $file_name= Str::slug($code);
         $save_file = $this->checkfile($this->store_path . $file_name . ".png");
-
-
-
         if ($imagick) {
             $png->drawimage($bar);
             //echo $png;
         }
-
-        if ($printtext) {
-            $len = strlen($code);
-            $tw = $len * imagefontwidth(5);
-            $xpos = ($width - $tw) / 2;
-            imagestring ( $png, 5, $xpos, $bh+5, $code, $fgcol );
-        }
-
-        $color = imagecolorallocate($png, 0, 0, 0);
-        $thickness = 1;
-        $x1 = 0;
-        $y1 = 0;
-        $x2 = imagesx($png) - 1;
-        $y2 = imagesy($png) - 1;
-
-        for($i = 0; $i < $thickness; $i++)
-        {
-
-            imagerectangle($png, $x1++, $y1++, $x2--, $y2--, $color);
-        }
-
-
         if (ImagePng($png, $save_file)) {
             imagedestroy($png);
             return str_replace(public_path(), '', $save_file);
